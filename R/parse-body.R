@@ -1,3 +1,57 @@
+postBodyFilter <- function(req){
+  handled <- req$.internal$postBodyHandled
+  if (is.null(handled) || handled != TRUE) {
+    # This will return raw bytes
+    body <- req$rook.input$read()
+    type <- req$HTTP_CONTENT_TYPE
+    args <- parseBody(body, type)
+    req$args <- c(req$args, args)
+    req$postBodyRaw <- body
+    if (isTRUE(getOption("plumber.postBody", TRUE))) {
+      req$rook.input$rewind()
+      req$postBody <- paste0(req$rook.input$read_lines(), collapse = "\n")
+    }
+    req$.internal$postBodyHandled <- TRUE
+  }
+  forward()
+}
+
+parseBody <- function(body, content_type = NULL) {
+  if (!is.raw(body)) {body <- charToRaw(body)}
+  toparse <- list(value = body, content_type = content_type)
+  parseRaw(toparse)
+}
+
+parseRaw <- function(toparse) {
+  if (length(toparse$value) == 0L) return(list())
+  parser <- parserPicker(toparse$content_type, toparse$value[1], toparse$filename)
+  do.call(parser(), toparse)
+}
+
+parserPicker <- function(content_type, first_byte, filename = NULL) {
+  #fast default to json when first byte is 7b (ascii {)
+  if (first_byte == as.raw(123L)) {
+    return(.globals$parsers$func[["json"]])
+  }
+  if (is.null(content_type)) {
+    return(.globals$parsers$func[["query"]])
+  }
+  # else try to find a match
+  patterns <- .globals$parsers$pattern
+  parser <- .globals$parsers$func[stri_startswith_fixed(content_type, patterns)]
+  # Should we warn when multiple parsers match?
+  # warning("Multiple body parsers matches for content-type : ", toparse$content_type, ". Parser ", names(parser)[1L], " used.")
+  if (length(parser) == 0L) {
+    if (is.null(filename)) {
+      return(.globals$parsers$func[["query"]])
+    } else {
+      return(.globals$parsers$func[["octet"]])
+    }
+  } else {
+    return(parser[[1L]])
+  }
+}
+
 
 
 #' Plumber Parsers
@@ -29,7 +83,7 @@ NULL
 #' to build parser are `value`, `content_type` and `filename` (only available
 #' in `multipart-form` body).
 #' ```r
-#' parser <- function(...) {
+#' parser <- function() {
 #'   function(value, content_type = "ct", filename, ...) {
 #'     # do something with raw value
 #'   }
@@ -40,7 +94,7 @@ NULL
 #' plumber endpoint function args.
 #'
 #' @examples
-#' parser_json <- function(...) {
+#' parser_json <- function() {
 #'   function(value, content_type = "application/json", ...) {
 #'     charset <- getCharacterSet(content_type)
 #'     value <- rawToChar(value)
@@ -68,9 +122,8 @@ addParser <- function(name, parser, pattern = NULL) {
 
 #' JSON
 #' @rdname parsers
-#' @param ... Raw values and headers are passed there.
 #' @export
-parser_json <- function(...) {
+parser_json <- function() {
   function(value, content_type = NULL, ...) {
     charset <- getCharacterSet(content_type)
     value <- rawToChar(value)
@@ -85,7 +138,7 @@ parser_json <- function(...) {
 #' QUERY STRING
 #' @rdname parsers
 #' @export
-parser_query <- function(...) {
+parser_query <- function() {
   function(value, content_type = NULL, ...) {
     charset <- getCharacterSet(content_type)
     value <- rawToChar(value)
@@ -100,7 +153,7 @@ parser_query <- function(...) {
 #' TEXT
 #' @rdname parsers
 #' @export
-parser_text <- function(...) {
+parser_text <- function() {
   function(value, content_type = NULL, ...) {
     charset <- getCharacterSet(content_type)
     value <- rawToChar(value)
@@ -115,7 +168,7 @@ parser_text <- function(...) {
 #" RDS
 #' @rdname parsers
 #' @export
-parser_rds <- function(...) {
+parser_rds <- function() {
   function(value, filename, ...) {
     tmp <- tempfile("plumb", fileext = paste0("_", basename(filename)))
     on.exit(file.remove(tmp), add = TRUE)
@@ -131,7 +184,7 @@ parser_rds <- function(...) {
 #' @rdname parsers
 #' @export
 #' @importFrom webutils parse_multipart
-parser_multi <- function(...) {
+parser_multi <- function() {
   function(value, content_type, ...) {
     if (!stri_detect_fixed(content_type, "boundary=", case_insensitive = TRUE))
       stop("No boundary found in multipart content-type header: ", content_type)
@@ -152,12 +205,29 @@ parser_multi <- function(...) {
 
 #' OCTET
 #' @rdname parsers
-#' @param ... Raw values and headers are passed there.
 #' @export
-parser_octet <- function(...) {
+parser_octet <- function() {
   function(value, filename = NULL, ...) {
     attr(value, "filename") <- filename
     return(value)
+  }
+}
+
+
+
+
+#' YAML
+#' @rdname parsers
+#' @export
+parser_yaml <- function() {
+  if (!requireNamespace("yaml", quietly = TRUE)) {
+    stop("yaml must be installed for the yaml parser to work")
+  }
+  function(value, content_type = NULL, ...) {
+    charset <- getCharacterSet(content_type)
+    value <- rawToChar(value)
+    Encoding(value) <- charset
+    yaml::yaml.load(value)
   }
 }
 
@@ -171,4 +241,5 @@ addParsers_onLoad <- function() {
   addParser("rds", parser_rds, "application/rds")
   addParser("multi", parser_multi, "multipart/form-data")
   addParser("octet", parser_octet, "application/octet")
+  addParser("yaml", parser_yaml, "application/x-yaml")
 }

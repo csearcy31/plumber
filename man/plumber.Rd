@@ -5,16 +5,17 @@
 \alias{plumber}
 \title{Plumber Router}
 \usage{
-plumb(file, dir = ".")
+plumb(file = NULL, dir = ".")
 }
 \arguments{
-\item{file}{path to file to plumb}
+\item{file}{The file to parse as the plumber router definition.}
 
-\item{dir}{dir path where to look for file to plumb}
+\item{dir}{The directory containing the \code{plumber.R} file to parse as the
+plumber router definition. Alternatively, if an \code{entrypoint.R} file is
+found, it will take precedence and be responsible for returning a runnable
+router.}
 }
 \description{
-Plumber Router
-
 Plumber Router
 }
 \details{
@@ -24,85 +25,6 @@ eventually to a corresponding endpoint, if one is found.
 
 See \url{http://www.rplumber.io/docs/programmatic/} for additional
 details on the methods available on this object.
-
-\code{port} does not need to be explicitly assigned.
-It will be attributed automatically in the following priority order :
-option \code{plumber.port}, \code{port} value in global environment, a random port
-between 3000 and 10000 that is not blacklisted. When in unable to find
-an available port, method will fail.
-
-\code{swagger} should be either a logial or set to a function . When \code{TRUE} or a
-function, multiple handles will be added to \code{plumber} object. OpenAPI json
-file will be served on paths \verb{/openapi.json} and \verb{/swagger.json}. Swagger UI
-will be served on paths \verb{/__swagger__/index.html} and \verb{/__swagger__/}. When
-using a function, it will receive the plumber router as the first parameter
-and currrent swagger specifications as the second. This function should return a
-list containing swagger specifications.
-See \url{https://swagger.io/docs/specification/}
-
-\code{swaggerCallback} When set, it will be called with a character string corresponding
-to the swagger UI url. It allows RStudio to open swagger UI when plumber router
-run method is executed using default \code{plumber.swagger.url} option.
-
-Plumber routers can be “nested” by mounting one into another
-using the \code{mount()} method. This allows you to compartmentalize your API
-by paths which is a great technique for decomposing large APIs into smaller files.
-
-Plumber routers support the notion of "hooks" that can be registered
-to execute some code at a particular point in the lifecycle of a request.
-Plumber routers currently support four hooks:
-\enumerate{
-\item \code{preroute(data, req, res)}
-\item \code{postroute(data, req, res, value)}
-\item \code{preserialize(data, req, res, value)}
-\item \code{postserialize(data, req, res, value)}
-}
-In all of the above you have access to a disposable environment in the \code{data}
-parameter that is created as a temporary data store for each request. Hooks
-can store temporary data in these hooks that can be reused by other hooks
-processing this same request.
-
-One feature when defining hooks in Plumber routers is the ability to modify
-the returned value. The convention for such hooks is: any function that accepts
-a parameter named \code{value} is expected to return the new value. This could
-be an unmodified version of the value that was passed in, or it could be a
-mutated value. But in either case, if your hook accepts a parameter
-named \code{value}, whatever your hook returns will be used as the new value
-for the response.
-
-You can add hooks using the \code{registerHook} method, or you can add multiple
-hooks at once using the \code{registerHooks} method which takes a name list in
-which the names are the names of the hooks, and the values are the
-handlers themselves.
-
-The “handler” functions that you define in these handle calls
-are identical to the code you would have defined in your plumber.R file
-if you were using annotations to define your API. The handle() method
-takes additional arguments that allow you to control nuanced behavior
-of the endpoint like which filter it might preempt or which serializer
-it should use.
-
-required for httpuv interface
-
-required for httpuv interface
-
-required for httpuv interface
-
-Sets the default serializer of the router.
-
-Sets the handler that gets called if an
-incoming request can’t be served by any filter, endpoint, or sub-router.
-
-Sets the error handler which gets invoked if any filter or
-endpoint generates an error.
-
-addEndpoint has been deprecated in v0.4.0 and will be removed in a coming release. Please use \code{handle()} instead.
-
-addAssets has been deprecated in v0.4.0 and will be removed in a coming release. Please use \code{mount} and \code{PlumberStatic$new()} instead.
-
-addFilter has been deprecated in v0.4.0 and will be removed in a coming release. Please use \code{filter} instead.
-
-addGlobalProcessor has been deprecated in v0.4.0 and will be removed in a coming release. Please use \code{registerHook}(s) instead.
 }
 \examples{
 
@@ -225,8 +147,9 @@ pr$setErrorHandler(function(req, res) {cat(res$body)})
 \item \href{#method-set404Handler}{\code{plumber$set404Handler()}}
 \item \href{#method-setErrorHandler}{\code{plumber$setErrorHandler()}}
 \item \href{#method-filter}{\code{plumber$filter()}}
-\item \href{#method-swaggerFile}{\code{plumber$swaggerFile()}}
+\item \href{#method-apiSpec}{\code{plumber$apiSpec()}}
 \item \href{#method-openAPIFile}{\code{plumber$openAPIFile()}}
+\item \href{#method-swaggerFile}{\code{plumber$swaggerFile()}}
 \item \href{#method-addEndpoint}{\code{plumber$addEndpoint()}}
 \item \href{#method-addAssets}{\code{plumber$addAssets()}}
 \item \href{#method-addFilter}{\code{plumber$addFilter()}}
@@ -253,7 +176,7 @@ Create a new \code{plumber} router
 \subsection{Arguments}{
 \if{html}{\out{<div class="arguments">}}
 \describe{
-\item{\code{file}}{The file to parse as the plumber router definition}
+\item{\code{file}}{path to file to plumb}
 
 \item{\code{filters}}{a list of plumber filters}
 
@@ -269,7 +192,7 @@ A new \code{plumber} router
 \if{html}{\out{<a id="method-run"></a>}}
 \if{latex}{\out{\hypertarget{method-run}{}}}
 \subsection{Method \code{run()}}{
-Start an a server using \code{plumber} object.
+Start a server using \code{plumber} object.
 \subsection{Usage}{
 \if{html}{\out{<div class="r">}}\preformatted{plumber$run(
   host = "127.0.0.1",
@@ -291,7 +214,7 @@ all IPv4 addresses and "::/0" represents all IPv6 addresses.}
 be listened on. Note that on most Unix-like systems including Linux and
 Mac OS X, port numbers smaller than 1025 require root privileges.}
 
-\item{\code{swagger}}{a function that enhances the existing swagger specification.}
+\item{\code{swagger}}{a function that enhances the existing OpenAPI Specification.}
 
 \item{\code{debug}}{\code{TRUE} provides more insight into your API errors.}
 
@@ -299,6 +222,23 @@ Mac OS X, port numbers smaller than 1025 require root privileges.}
 }
 \if{html}{\out{</div>}}
 }
+\subsection{Details}{
+\code{port} does not need to be explicitly assigned.
+
+\code{swagger} should be either a logial or a function . When \code{TRUE} or a
+function, multiple handles will be added to \code{plumber} object. OpenAPI json
+file will be served on paths \verb{/openapi.json} and \verb{/swagger.json}. Swagger UI
+will be served on paths \verb{/__swagger__/index.html} and \verb{/__swagger__/}. When
+using a function, it will receive the plumber router as the first parameter
+and current OpenAPI Specification as the second. This function should return a
+list containing OpenAPI Specification.
+See \url{http://spec.openapis.org/oas/v3.0.3}
+
+\code{swaggerCallback} When set, it will be called with a character string corresponding
+to the swagger UI url. It allows RStudio to open swagger UI when plumber router
+run method is executed using default \code{plumber.swagger.url} option.
+}
+
 \subsection{Examples}{
 \if{html}{\out{<div class="r example copy">}}
 \preformatted{\dontrun{
@@ -333,6 +273,12 @@ Mount a plumber router
 }
 \if{html}{\out{</div>}}
 }
+\subsection{Details}{
+Plumber routers can be “nested” by mounting one into another
+using the \code{mount()} method. This allows you to compartmentalize your API
+by paths which is a great technique for decomposing large APIs into smaller files.
+}
+
 \subsection{Examples}{
 \if{html}{\out{<div class="r example copy">}}
 \preformatted{\dontrun{
@@ -371,6 +317,35 @@ Register a hook
 }
 \if{html}{\out{</div>}}
 }
+\subsection{Details}{
+Plumber routers support the notion of "hooks" that can be registered
+to execute some code at a particular point in the lifecycle of a request.
+Plumber routers currently support four hooks:
+\enumerate{
+\item \code{preroute(data, req, res)}
+\item \code{postroute(data, req, res, value)}
+\item \code{preserialize(data, req, res, value)}
+\item \code{postserialize(data, req, res, value)}
+}
+In all of the above you have access to a disposable environment in the \code{data}
+parameter that is created as a temporary data store for each request. Hooks
+can store temporary data in these hooks that can be reused by other hooks
+processing this same request.
+
+One feature when defining hooks in Plumber routers is the ability to modify
+the returned value. The convention for such hooks is: any function that accepts
+a parameter named \code{value} is expected to return the new value. This could
+be an unmodified version of the value that was passed in, or it could be a
+mutated value. But in either case, if your hook accepts a parameter
+named \code{value}, whatever your hook returns will be used as the new value
+for the response.
+
+You can add hooks using the \code{registerHook} method, or you can add multiple
+hooks at once using the \code{registerHooks} method which takes a name list in
+which the names are the names of the hooks, and the values are the
+handlers themselves.
+}
+
 \subsection{Examples}{
 \if{html}{\out{<div class="r example copy">}}
 \preformatted{\dontrun{
@@ -429,6 +404,15 @@ Define endpoints
 }
 \if{html}{\out{</div>}}
 }
+\subsection{Details}{
+The “handler” functions that you define in these handle calls
+are identical to the code you would have defined in your plumber.R file
+if you were using annotations to define your API. The handle() method
+takes additional arguments that allow you to control nuanced behavior
+of the endpoint like which filter it might preempt or which serializer
+it should use.
+}
+
 \subsection{Examples}{
 \if{html}{\out{<div class="r example copy">}}
 \preformatted{\dontrun{
@@ -522,6 +506,10 @@ httpuv interface call function
 }
 \if{html}{\out{</div>}}
 }
+\subsection{Details}{
+required for httpuv interface
+}
+
 }
 \if{html}{\out{<hr>}}
 \if{html}{\out{<a id="method-onHeaders"></a>}}
@@ -539,6 +527,10 @@ httpuv interface onHeaders function
 }
 \if{html}{\out{</div>}}
 }
+\subsection{Details}{
+required for httpuv interface
+}
+
 }
 \if{html}{\out{<hr>}}
 \if{html}{\out{<a id="method-onWSOpen"></a>}}
@@ -556,6 +548,10 @@ httpuv interface onWSOpen function
 }
 \if{html}{\out{</div>}}
 }
+\subsection{Details}{
+required for httpuv interface
+}
+
 }
 \if{html}{\out{<hr>}}
 \if{html}{\out{<a id="method-setSerializer"></a>}}
@@ -572,6 +568,10 @@ httpuv interface onWSOpen function
 }
 \if{html}{\out{</div>}}
 }
+\subsection{Details}{
+Sets the default serializer of the router.
+}
+
 }
 \if{html}{\out{<hr>}}
 \if{html}{\out{<a id="method-set404Handler"></a>}}
@@ -588,6 +588,11 @@ httpuv interface onWSOpen function
 }
 \if{html}{\out{</div>}}
 }
+\subsection{Details}{
+Sets the handler that gets called if an
+incoming request can’t be served by any filter, endpoint, or sub-router.
+}
+
 \subsection{Examples}{
 \if{html}{\out{<div class="r example copy">}}
 \preformatted{\dontrun{
@@ -615,6 +620,11 @@ pr$set404Handler(function(req, res) {cat(req$PATH_INFO)})
 }
 \if{html}{\out{</div>}}
 }
+\subsection{Details}{
+Sets the error handler which gets invoked if any filter or
+endpoint generates an error.
+}
+
 \subsection{Examples}{
 \if{html}{\out{<div class="r example copy">}}
 \preformatted{\dontrun{
@@ -649,12 +659,12 @@ Add a filter to plumber router
 }
 }
 \if{html}{\out{<hr>}}
-\if{html}{\out{<a id="method-swaggerFile"></a>}}
-\if{latex}{\out{\hypertarget{method-swaggerFile}{}}}
-\subsection{Method \code{swaggerFile()}}{
+\if{html}{\out{<a id="method-apiSpec"></a>}}
+\if{latex}{\out{\hypertarget{method-apiSpec}{}}}
+\subsection{Method \code{apiSpec()}}{
 Retrieve openAPI file
 \subsection{Usage}{
-\if{html}{\out{<div class="r">}}\preformatted{plumber$swaggerFile()}\if{html}{\out{</div>}}
+\if{html}{\out{<div class="r">}}\preformatted{plumber$apiSpec()}\if{html}{\out{</div>}}
 }
 
 }
@@ -665,6 +675,16 @@ Retrieve openAPI file
 Retrieve openAPI file
 \subsection{Usage}{
 \if{html}{\out{<div class="r">}}\preformatted{plumber$openAPIFile()}\if{html}{\out{</div>}}
+}
+
+}
+\if{html}{\out{<hr>}}
+\if{html}{\out{<a id="method-swaggerFile"></a>}}
+\if{latex}{\out{\hypertarget{method-swaggerFile}{}}}
+\subsection{Method \code{swaggerFile()}}{
+Retrieve openAPI file
+\subsection{Usage}{
+\if{html}{\out{<div class="r">}}\preformatted{plumber$swaggerFile()}\if{html}{\out{</div>}}
 }
 
 }
@@ -706,6 +726,10 @@ Retrieve openAPI file
 }
 \if{html}{\out{</div>}}
 }
+\subsection{Details}{
+addEndpoint has been deprecated in v0.4.0 and will be removed in a coming release. Please use \code{handle()} instead.
+}
+
 }
 \if{html}{\out{<hr>}}
 \if{html}{\out{<a id="method-addAssets"></a>}}
@@ -726,6 +750,10 @@ Retrieve openAPI file
 }
 \if{html}{\out{</div>}}
 }
+\subsection{Details}{
+addAssets has been deprecated in v0.4.0 and will be removed in a coming release. Please use \code{mount} and \code{PlumberStatic$new()} instead.
+}
+
 }
 \if{html}{\out{<hr>}}
 \if{html}{\out{<a id="method-addFilter"></a>}}
@@ -748,6 +776,10 @@ Retrieve openAPI file
 }
 \if{html}{\out{</div>}}
 }
+\subsection{Details}{
+addFilter has been deprecated in v0.4.0 and will be removed in a coming release. Please use \code{filter} instead.
+}
+
 }
 \if{html}{\out{<hr>}}
 \if{html}{\out{<a id="method-addGlobalProcessor"></a>}}
@@ -764,6 +796,10 @@ Retrieve openAPI file
 }
 \if{html}{\out{</div>}}
 }
+\subsection{Details}{
+addGlobalProcessor has been deprecated in v0.4.0 and will be removed in a coming release. Please use \code{registerHook}(s) instead.
+}
+
 }
 \if{html}{\out{<hr>}}
 \if{html}{\out{<a id="method-clone"></a>}}
